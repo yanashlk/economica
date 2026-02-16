@@ -5,7 +5,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Env
-.env
+api/.env
 .env.*
 !.env.example
 
