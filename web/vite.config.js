@@ -3,6 +3,7 @@ import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
   plugins: [vue()],
+  appType: "spa",
   server: {
     proxy: {
       "/forms": "http://localhost:3001",

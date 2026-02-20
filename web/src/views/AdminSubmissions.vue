@@ -61,6 +61,12 @@ function fmt(iso) {
   }
 }
 
+async function parseJsonSafe(r) {
+  const text = await r.text();
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { return { _raw: text }; }
+}
+
 async function load() {
   loading.value = true;
   error.value = "";
@@ -69,9 +75,9 @@ async function load() {
     const r = await fetch(`/admin/submissions${q}`, {
       headers: { Authorization: `Bearer ${token()}` },
     });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data?.error || "Load failed");
-    items.value = data.items || [];
+    const data = await parseJsonSafe(r);
+    if (!r.ok) throw new Error(data?.error || data?._raw || `HTTP ${r.status}`);
+    items.value = data?.items || [];
   } catch (e) {
     error.value = e.message;
   } finally {
