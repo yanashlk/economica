@@ -1,0 +1,216 @@
+{
+  "form_slug": "main-brief",
+  "questions": [
+    {
+      "section": "Контактні дані",
+      "question_text": "Як до вас звертатися",
+      "qtype": "text",
+      "required": true,
+      "sort_order": 1
+    },
+    {
+      "section": "Контактні дані",
+      "question_text": "Номер телефону",
+      "qtype": "text",
+      "required": true,
+      "sort_order": 2
+    },
+    {
+      "section": "Контактні дані",
+      "question_text": "Зручний спосіб звʼязку (telegram/viber/whats up)",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 3
+    },
+    {
+      "section": "Контактні дані",
+      "question_text": "Зручний період для спілкування",
+      "qtype": "text",
+      "required": false,
+      "sort_order": 4
+    },
+
+    {
+      "section": "Загальні відомості",
+      "question_text": "Назва вашого проєкту (існуюча або майбутня)",
+      "qtype": "text",
+      "required": true,
+      "sort_order": 10
+    },
+    {
+      "section": "Загальні відомості",
+      "question_text": "Суть бренду, основна ідея або місія продукту",
+      "qtype": "textarea",
+      "required": true,
+      "sort_order": 11
+    },
+    {
+      "section": "Загальні відомості",
+      "question_text": "Унікальна торгова пропозиція (УТП) та позиціювання продукту",
+      "qtype": "textarea",
+      "required": true,
+      "sort_order": 12
+    },
+    {
+      "section": "Загальні відомості",
+      "question_text": "Назвіть щонайменше три основні цінності продукту",
+      "qtype": "textarea",
+      "required": true,
+      "sort_order": 13
+    },
+
+    {
+      "section": "Цільова аудиторія",
+      "question_text": "Хто є основною цільовою аудиторією сайту",
+      "qtype": "textarea",
+      "required": true,
+      "sort_order": 20
+    },
+    {
+      "section": "Цільова аудиторія",
+      "question_text": "Географія цільової аудиторії",
+      "qtype": "text",
+      "required": false,
+      "sort_order": 21
+    },
+    {
+      "section": "Цільова аудиторія",
+      "question_text": "Основні потреби або болі користувачів",
+      "qtype": "textarea",
+      "required": true,
+      "sort_order": 22
+    },
+
+    {
+      "section": "Конкуренти",
+      "question_text": "Основні конкуренти (посилання на сайти)",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 30
+    },
+    {
+      "section": "Конкуренти",
+      "question_text": "Що вам подобається у сайтах конкурентів",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 31
+    },
+    {
+      "section": "Конкуренти",
+      "question_text": "Що вам не подобається у рішеннях конкурентів",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 32
+    },
+
+    {
+      "section": "Функціональні вимоги",
+      "question_text": "Тип вебпроєкту (корпоративний сайт, магазин, вебзастосунок)",
+      "qtype": "text",
+      "required": true,
+      "sort_order": 40
+    },
+    {
+      "section": "Функціональні вимоги",
+      "question_text": "Основна ціль сайту",
+      "qtype": "text",
+      "required": true,
+      "sort_order": 41
+    },
+    {
+      "section": "Функціональні вимоги",
+      "question_text": "Необхідні сторінки сайту",
+      "qtype": "textarea",
+      "required": true,
+      "sort_order": 42
+    },
+    {
+      "section": "Функціональні вимоги",
+      "question_text": "Які форми або інтерактивні елементи потрібні на сайті",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 43
+    },
+
+    {
+      "section": "Нефункціональні вимоги",
+      "question_text": "Побажання щодо дизайну та стилю",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 50
+    },
+    {
+      "section": "Нефункціональні вимоги",
+      "question_text": "Референси сайтів, які вам подобаються. Можете вставити посилання на пінтерест(наприклад)",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 51
+    },
+    {
+      "section": "Нефункціональні вимоги",
+      "question_text": "Мовні версії сайту",
+      "qtype": "text",
+      "required": false,
+      "sort_order": 52
+    },
+    {
+      "section": "Нефункціональні вимоги",
+      "question_text": "Чи потрібні SEO, аналітика або інтеграції",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 53
+    },
+
+    {
+      "section": "Контент і ресурси",
+      "question_text": "Хто надає тексти для сайту",
+      "qtype": "text",
+      "required": false,
+      "sort_order": 60
+    },
+    {
+      "section": "Контент і ресурси",
+      "question_text": "Хто надає фото та відеоматеріали",
+      "qtype": "text",
+      "required": false,
+      "sort_order": 61
+    },
+    {
+      "section": "Контент і ресурси",
+      "question_text": "Чи є логотип або брендбук",
+      "qtype": "text",
+      "required": false,
+      "sort_order": 62
+    },
+
+    {
+      "section": "Дедлайни та обмеження",
+      "question_text": "Бажана дата запуску проєкту",
+      "qtype": "date",
+      "required": false,
+      "sort_order": 70
+    },
+    {
+      "section": "Дедлайни та обмеження",
+      "question_text": "Критичні дедлайни або часові обмеження",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 71
+    },
+
+    {
+      "section": "Очікування та результат",
+      "question_text": "Як ви зрозумієте, що проєкт успішний",
+      "qtype": "textarea",
+      "required": true,
+      "sort_order": 80
+    },
+    {
+      "section": "Очікування та результат",
+      "question_text": "Додаткові коментарі або побажання",
+      "qtype": "textarea",
+      "required": false,
+      "sort_order": 81
+    }
+  ]
+}

@@ -23,8 +23,8 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-const email = ref("vt221_shyai@student.ztu.edu.ua");
-const password = ref("admin12345");
+const email = ref(import.meta.env.ADMIN_EMAIL || "");
+const password = ref(import.meta.env.ADMIN_PASSWORD || "");
 const busy = ref(false);
 const msg = ref("");
 

@@ -306,13 +306,8 @@ app.get("/admin/submissions", requireAdmin, async (req, res) => {
             whereParts.push(`s.status = $${params.length}`);
         }
 
-        // reviewed=0 -> only NOT reviewed
-        // reviewed=1 -> only reviewed
-        if (reviewed === "0") {
-            whereParts.push("s.reviewed_at is null");
-        } else if (reviewed === "1") {
-            whereParts.push("s.reviewed_at is not null");
-        }
+        if (reviewed === "0") whereParts.push("s.reviewed_at is null");
+        else if (reviewed === "1") whereParts.push("s.reviewed_at is not null");
 
         const where = whereParts.length ? `where ${whereParts.join(" and ")}` : "";
 
@@ -382,10 +377,7 @@ app.patch("/admin/submissions/:id", requireAdmin, async (req, res) => {
 
         const pool = getPool();
 
-        const subRes = await pool.query(
-            "select id, form_id from submissions where id=$1",
-            [id]
-        );
+        const subRes = await pool.query("select id, form_id from submissions where id=$1", [id]);
         const submission = subRes.rows[0];
         if (!submission) return res.status(404).json({ error: "Submission not found" });
 
@@ -402,7 +394,6 @@ app.patch("/admin/submissions/:id", requireAdmin, async (req, res) => {
                     return res.status(400).json({ error: "Each answer must have questionId" });
                 }
 
-                // питання має належати цій формі
                 const qRes = await client.query(
                     `select id, qtype
            from questions
@@ -419,9 +410,8 @@ app.patch("/admin/submissions/:id", requireAdmin, async (req, res) => {
                 let value_bool = null;
                 let value_date = null;
 
-                // дозволяємо очищення відповіді
                 if (value === null || value === undefined || value === "") {
-                    // all nulls
+                    // очищення
                 } else if (q.qtype === "checkbox") {
                     if (typeof value !== "boolean") {
                         await client.query("rollback");
@@ -476,14 +466,10 @@ app.post("/admin/submissions/:id/review", requireAdmin, async (req, res) => {
         const { id } = req.params;
         const pool = getPool();
 
-        const sRes = await pool.query(
-            "select id, reviewed_at from submissions where id=$1",
-            [id]
-        );
+        const sRes = await pool.query("select id, reviewed_at from submissions where id=$1", [id]);
         const s = sRes.rows[0];
         if (!s) return res.status(404).json({ error: "Submission not found" });
 
-        // toggle: якщо вже reviewed -> зняти; якщо ні -> поставити
         if (s.reviewed_at) {
             const upd = await pool.query(
                 "update submissions set reviewed_at=null, reviewed_by=null, updated_at=now() where id=$1 returning reviewed_at, reviewed_by",
@@ -504,33 +490,28 @@ app.post("/admin/submissions/:id/review", requireAdmin, async (req, res) => {
 });
 
 app.delete("/admin/submissions/:id", requireAdmin, async (req, res) => {
+    const pool = getPool();
+    const client = await pool.connect();
+
     try {
         const { id } = req.params;
-        const pool = getPool();
 
-        // Перевірка існування
-        const sRes = await pool.query("select id from submissions where id=$1", [id]);
+        const sRes = await client.query("select id from submissions where id=$1", [id]);
         if (!sRes.rows[0]) return res.status(404).json({ error: "Not found" });
 
-        await pool.query("begin");
-
-        // 1) видалити відповіді (якщо немає ON DELETE CASCADE)
-        await pool.query("delete from answers where submission_id=$1", [id]);
-
-        // 2) видалити сам бриф
-        await pool.query("delete from submissions where id=$1", [id]);
-
-        await pool.query("commit");
+        await client.query("begin");
+        await client.query("delete from answers where submission_id=$1", [id]);
+        await client.query("delete from submissions where id=$1", [id]);
+        await client.query("commit");
 
         return res.json({ ok: true });
     } catch (e) {
-        try { await getPool().query("rollback"); } catch {}
+        try { await client.query("rollback"); } catch {}
         console.error(e);
         return res.status(500).json({ error: "Server error" });
+    } finally {
+        client.release();
     }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`API running on http://localhost:${PORT}`);
-});
+export default app;
