@@ -7,16 +7,14 @@ import { requireAdmin } from "./auth.js";
 const app = express();
 app.use(express.json());
 
-const apiRouter = express.Router();
-
-apiRouter.get("/health", (req, res) => {
+app.get("/health", (req, res) => {
     res.json({ ok: true });
 });
 
 /**
  * AUTH (admin)
  */
-apiRouter.post("/auth/login", async (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body || {};
         if (!email || !password) {
@@ -56,10 +54,11 @@ apiRouter.post("/auth/login", async (req, res) => {
 /**
  * PUBLIC: get form by slug
  */
-apiRouter.get("/forms/:slug", async (req, res) => {
+app.get("/api/forms/:slug", async (req, res) => {
     try {
         const { slug } = req.params;
         const pool = getPool();
+
         const formRes = await pool.query(
             "select id, slug, title from forms where slug=$1 and is_active=true",
             [slug]
@@ -84,9 +83,9 @@ apiRouter.get("/forms/:slug", async (req, res) => {
 });
 
 /**
- * PUBLIC: submissions logic
+ * PUBLIC: create submission draft
  */
-apiRouter.post("/submissions", async (req, res) => {
+app.post("/api/submissions", async (req, res) => {
     try {
         const { formSlug } = req.body || {};
         if (!formSlug) return res.status(400).json({ error: "formSlug required" });
@@ -103,6 +102,7 @@ apiRouter.post("/submissions", async (req, res) => {
             "insert into submissions(form_id, status) values ($1, 'draft') returning id, status, created_at",
             [form.id]
         );
+
         return res.status(201).json({ submission: created.rows[0] });
     } catch (e) {
         console.error(e);
@@ -110,39 +110,56 @@ apiRouter.post("/submissions", async (req, res) => {
     }
 });
 
-apiRouter.patch("/submissions/:id", async (req, res) => {
+/**
+ * PUBLIC: save answers (upsert)
+ */
+app.patch("/api/submissions/:id", async (req, res) => {
     try {
         const { id } = req.params;
         const { answers } = req.body || {};
-        if (!Array.isArray(answers)) return res.status(400).json({ error: "answers must be an array" });
+
+        if (!Array.isArray(answers)) {
+            return res.status(400).json({ error: "answers must be an array" });
+        }
 
         const pool = getPool();
-        const subRes = await pool.query("select id, form_id, status from submissions where id=$1", [id]);
+        const subRes = await pool.query(
+            "select id, form_id, status from submissions where id=$1",
+            [id]
+        );
         const submission = subRes.rows[0];
-
         if (!submission) return res.status(404).json({ error: "Submission not found" });
-        if (submission.status !== "draft") return res.status(409).json({ error: "Only draft can be edited" });
 
         const client = await pool.connect();
         try {
             await client.query("begin");
             for (const a of answers) {
-                const { questionId, value } = a;
-                const qRes = await client.query("select id, qtype from questions where id=$1 and form_id=$2", [questionId, submission.form_id]);
+                const qRes = await client.query(
+                    `select id, qtype from questions where id=$1 and form_id=$2`,
+                    [a.questionId, submission.form_id]
+                );
                 const q = qRes.rows[0];
                 if (!q) continue;
 
-                let v_text = null, v_bool = null, v_date = null;
-                if (q.qtype === "checkbox") v_bool = !!value;
-                else if (q.qtype === "date") v_date = value;
-                else v_text = String(value || "");
+                let value_text = null, value_bool = null, value_date = null;
+
+                if (a.value === null || a.value === undefined || a.value === "") {
+                    // пропускаємо
+                } else if (q.qtype === "checkbox") {
+                    value_bool = !!a.value;
+                } else if (q.qtype === "date") {
+                    value_date = a.value;
+                } else {
+                    value_text = String(a.value);
+                }
 
                 await client.query(
                     `insert into answers (submission_id, question_id, value_text, value_bool, value_date, updated_at)
                      values ($1, $2, $3, $4, $5, now())
-                     on conflict (submission_id, question_id) do update set
-                     value_text = excluded.value_text, value_bool = excluded.value_bool, value_date = excluded.value_date, updated_at = now()`,
-                    [id, questionId, v_text, v_bool, v_date]
+                     on conflict (submission_id, question_id)
+                     do update set value_text = excluded.value_text, value_bool = excluded.value_bool, 
+                                   value_date = excluded.value_date, updated_at = now()`,
+                    [id, a.questionId, value_text, value_bool, value_date]
                 );
             }
             await client.query("update submissions set updated_at=now() where id=$1", [id]);
@@ -160,11 +177,16 @@ apiRouter.patch("/submissions/:id", async (req, res) => {
     }
 });
 
-apiRouter.post("/submissions/:id/submit", async (req, res) => {
+/**
+ * PUBLIC: finalize submit
+ */
+app.post("/api/submissions/:id/submit", async (req, res) => {
     try {
-        const { id } = req.params;
         const pool = getPool();
-        await pool.query("update submissions set status='submitted', submitted_at=now() where id=$1", [id]);
+        await pool.query(
+            "update submissions set status='submitted', submitted_at=now(), updated_at=now() where id=$1",
+            [req.params.id]
+        );
         return res.json({ ok: true });
     } catch (e) {
         console.error(e);
@@ -173,54 +195,99 @@ apiRouter.post("/submissions/:id/submit", async (req, res) => {
 });
 
 /**
- * ADMIN Routes
+ * ADMIN: list submissions (with filters)
  */
-apiRouter.get("/admin/submissions", requireAdmin, async (req, res) => {
+app.get("/api/admin/submissions", requireAdmin, async (req, res) => {
     try {
+        const { status, reviewed } = req.query;
         const pool = getPool();
+        const params = [];
+        const whereParts = [];
+
+        if (status === "draft" || status === "submitted") {
+            params.push(status);
+            whereParts.push(`s.status = $${params.length}`);
+        }
+        if (reviewed === "0") whereParts.push("s.reviewed_at is null");
+        else if (reviewed === "1") whereParts.push("s.reviewed_at is not null");
+
+        const where = whereParts.length ? `where ${whereParts.join(" and ")}` : "";
         const rows = await pool.query(
-            `select s.*, f.title as form_title from submissions s 
-             join forms f on f.id = s.form_id order by s.created_at desc limit 200`
+            `select s.id, s.status, s.created_at, s.submitted_at, s.reviewed_at, s.reviewed_by,
+                    f.slug as form_slug, f.title as form_title
+             from submissions s
+             join forms f on f.id = s.form_id
+             ${where}
+             order by s.created_at desc limit 200`,
+            params
         );
         return res.json({ items: rows.rows });
     } catch (e) {
+        console.error(e);
         return res.status(500).json({ error: "Server error" });
     }
 });
 
-apiRouter.get("/admin/submissions/:id", requireAdmin, async (req, res) => {
+/**
+ * ADMIN: submission details
+ */
+app.get("/api/admin/submissions/:id", requireAdmin, async (req, res) => {
     try {
-        const { id } = req.params;
         const pool = getPool();
-        const sRes = await pool.query("select s.*, f.title as form_title from submissions s join forms f on f.id = s.form_id where s.id=$1", [id]);
-        const qaRes = await pool.query("select q.*, a.value_text, a.value_bool, a.value_date from questions q left join answers a on a.question_id = q.id and a.submission_id = $1 where q.form_id = (select form_id from submissions where id=$1) order by q.sort_order", [id]);
-        return res.json({ submission: sRes.rows[0], qa: qaRes.rows });
+        const sRes = await pool.query(
+            `select s.*, f.title as form_title from submissions s 
+             join forms f on f.id = s.form_id where s.id=$1`, [req.params.id]
+        );
+        const submission = sRes.rows[0];
+        if (!submission) return res.status(404).json({ error: "Not found" });
+
+        const qaRes = await pool.query(
+            `select q.id as question_id, q.question_text, q.qtype, q.required, 
+                    a.value_text, a.value_bool, a.value_date
+             from questions q
+             left join answers a on a.question_id = q.id and a.submission_id = $1
+             where q.form_id = $2 and q.is_active=true
+             order by q.sort_order asc`,
+            [req.params.id, submission.form_id]
+        );
+
+        return res.json({ submission, qa: qaRes.rows });
     } catch (e) {
+        console.error(e);
         return res.status(500).json({ error: "Server error" });
     }
 });
 
-apiRouter.post("/admin/submissions/:id/review", requireAdmin, async (req, res) => {
+app.post("/api/admin/submissions/:id/review", requireAdmin, async (req, res) => {
     try {
         const pool = getPool();
-        await pool.query("update submissions set reviewed_at=now() where id=$1", [req.params.id]);
+        await pool.query(
+            `update submissions set reviewed_at = case when reviewed_at is null then now() else null end,
+             reviewed_by = $2 where id=$1`,
+            [req.params.id, req.user?.uid || null]
+        );
         return res.json({ ok: true });
     } catch (e) {
+        console.error(e);
         return res.status(500).json({ error: "Server error" });
     }
 });
 
-apiRouter.delete("/admin/submissions/:id", requireAdmin, async (req, res) => {
+app.delete("/api/admin/submissions/:id", requireAdmin, async (req, res) => {
+    const pool = getPool();
+    const client = await pool.connect();
     try {
-        const pool = getPool();
-        await pool.query("delete from answers where submission_id=$1", [req.params.id]);
-        await pool.query("delete from submissions where id=$1", [req.params.id]);
+        await client.query("begin");
+        await client.query("delete from answers where submission_id=$1", [req.params.id]);
+        await client.query("delete from submissions where id=$1", [req.params.id]);
+        await client.query("commit");
         return res.json({ ok: true });
     } catch (e) {
+        await client.query("rollback");
         return res.status(500).json({ error: "Server error" });
+    } finally {
+        client.release();
     }
 });
-
-app.use("/api", apiRouter);
 
 export default app;
