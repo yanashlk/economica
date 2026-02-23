@@ -6,7 +6,7 @@ import { apiJson } from "../api";
 const router = useRouter();
 
 const email = ref(import.meta.env.VITE_ADMIN_EMAIL || "");
-const password = ref("");
+const password = ref(import.meta.env.VITE_ADMIN_PASSWORD || "");
 
 const busy = ref(false);
 const msg = ref("");
@@ -21,7 +21,7 @@ async function login() {
   busy.value = true;
 
   try {
-    const data = await apiJson("/api/auth/login", "POST", {
+    const data = await apiJson("/auth/login", "POST", {
       email: email.value,
       password: password.value,
     });
