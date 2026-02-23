@@ -21,7 +21,7 @@ async function login() {
   busy.value = true;
 
   try {
-    const data = await apiJson("/auth/login", "POST", {
+    const data = await apiJson("/api/auth/login", "POST", {
       email: email.value,
       password: password.value,
     });

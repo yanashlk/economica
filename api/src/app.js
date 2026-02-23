@@ -15,7 +15,7 @@ app.get("/health", (req, res) => {
  * AUTH (admin)
  * Перевірка пароля через pgcrypto crypt() (бо seed робили crypt())
  */
-app.post("/auth/login", async (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body || {};
         if (!email || !password) {
