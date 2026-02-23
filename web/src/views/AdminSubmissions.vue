@@ -51,8 +51,10 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { apiGet, withAdminAuth } from "../api";
 
 const router = useRouter();
+
 const items = ref([]);
 const loading = ref(true);
 const error = ref("");
@@ -60,22 +62,12 @@ const error = ref("");
 const status = ref("");
 const onlyUnreviewed = ref(false);
 
-function token() {
-  return localStorage.getItem("admin_token");
-}
-
 function fmt(iso) {
   try {
     return new Date(iso).toLocaleString("uk-UA");
   } catch {
     return iso;
   }
-}
-
-async function parseJsonSafe(r) {
-  const text = await r.text();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return { _raw: text }; }
 }
 
 async function load() {
@@ -89,16 +81,13 @@ async function load() {
 
     const q = params.toString() ? `?${params.toString()}` : "";
 
-    const r = await fetch(`/admin/submissions${q}`, {
-      headers: { Authorization: `Bearer ${token()}` },
+    const data = await apiGet(`/admin/submissions${q}`, {
+      headers: withAdminAuth(),
     });
-
-    const data = await parseJsonSafe(r);
-    if (!r.ok) throw new Error(data?.error || data?._raw || `HTTP ${r.status}`);
 
     items.value = data?.items || [];
   } catch (e) {
-    error.value = e.message;
+    error.value = e?.message || "Помилка завантаження";
   } finally {
     loading.value = false;
   }

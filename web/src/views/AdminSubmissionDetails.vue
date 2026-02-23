@@ -3,13 +3,16 @@
     <div class="top">
       <div>
         <h1>Заявка</h1>
+
         <div v-if="submission" class="meta">
           <span class="pill">{{ submission.status }}</span>
           <span class="mono">{{ submission.id }}</span>
           <span>Створено: {{ fmt(submission.created_at) }}</span>
+
           <span v-if="submission.submitted_at">
             Відправлено: {{ fmt(submission.submitted_at) }}
           </span>
+
           <span v-if="submission.reviewed_at">
             Перевірено: {{ fmt(submission.reviewed_at) }}
           </span>
@@ -24,26 +27,14 @@
             :disabled="reviewBusy || loading"
             @click="toggleReviewed"
         >
-          {{
-            submission?.reviewed_at
-                ? "Зняти перевірено"
-                : "Позначити як перевірено"
-          }}
+          {{ submission?.reviewed_at ? "Зняти перевірено" : "Позначити як перевірено" }}
         </button>
 
-        <button
-            class="btn"
-            :disabled="saving || loading || !!error"
-            @click="save"
-        >
+        <button class="btn" :disabled="saving || loading || !!error" @click="save">
           {{ saving ? "Збереження..." : "Зберегти зміни" }}
         </button>
 
-        <button
-            class="btn danger"
-            :disabled="deleting || loading"
-            @click="remove"
-        >
+        <button class="btn danger" :disabled="deleting || loading" @click="remove">
           {{ deleting ? "Видаляю..." : "Видалити бриф" }}
         </button>
       </div>
@@ -94,8 +85,9 @@
 </template>
 
 <script setup>
-import {onMounted, reactive, ref} from "vue";
-import {useRoute, useRouter} from "vue-router";
+import { onMounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { apiGet, apiJson, withAdminAuth } from "../api";
 
 const route = useRoute();
 const router = useRouter();
@@ -105,17 +97,11 @@ const saving = ref(false);
 const error = ref("");
 const msg = ref("");
 const reviewBusy = ref(false);
+const deleting = ref(false);
 
 const submission = ref(null);
 const qa = ref([]);
-
 const editValues = reactive({});
-const deleting = ref(false);
-
-
-function token() {
-  return localStorage.getItem("admin_token");
-}
 
 function fmt(iso) {
   try {
@@ -125,24 +111,9 @@ function fmt(iso) {
   }
 }
 
-async function parseJsonSafe(r) {
-  const text = await r.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {_raw: text};
-  }
-}
-
 function toInitialValue(row) {
-  if (row.qtype === "checkbox") {
-    return row.value_bool === true; // false якщо null/false
-  }
-  if (row.qtype === "date") {
-    return row.value_date || "";
-  }
-  // text/textarea
+  if (row.qtype === "checkbox") return row.value_bool === true;
+  if (row.qtype === "date") return row.value_date || "";
   return row.value_text ?? "";
 }
 
@@ -150,23 +121,22 @@ async function load() {
   loading.value = true;
   error.value = "";
   msg.value = "";
+
   try {
     const id = route.params.id;
-    const r = await fetch(`/admin/submissions/${id}`, {
-      headers: {Authorization: `Bearer ${token()}`},
+
+    const data = await apiGet(`/admin/submissions/${id}`, {
+      headers: withAdminAuth(),
     });
-    const data = await parseJsonSafe(r);
-    if (!r.ok) throw new Error(data?.error || data?._raw || `HTTP ${r.status}`);
 
     submission.value = data.submission;
     qa.value = data.qa || [];
 
-    // заповнюємо editValues
     for (const row of qa.value) {
       editValues[row.question_id] = toInitialValue(row);
     }
   } catch (e) {
-    error.value = e.message;
+    error.value = e?.message || "Помилка завантаження";
   } finally {
     loading.value = false;
   }
@@ -184,23 +154,18 @@ function buildPayload() {
 async function save() {
   saving.value = true;
   msg.value = "";
+
   try {
     const id = route.params.id;
-    const r = await fetch(`/admin/submissions/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token()}`,
-      },
-      body: JSON.stringify(buildPayload()),
+
+    await apiJson(`/admin/submissions/${id}`, "PATCH", buildPayload(), {
+      headers: withAdminAuth(),
     });
-    const data = await parseJsonSafe(r);
-    if (!r.ok) throw new Error(data?.error || data?._raw || `HTTP ${r.status}`);
 
     msg.value = "Збережено ✅";
     await load();
   } catch (e) {
-    msg.value = `Помилка: ${e.message}`;
+    msg.value = `Помилка: ${e?.message || "невідома"}`;
   } finally {
     saving.value = false;
   }
@@ -220,17 +185,13 @@ async function remove() {
   try {
     const id = route.params.id;
 
-    const r = await fetch(`/admin/submissions/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token()}` },
+    await apiJson(`/admin/submissions/${id}`, "DELETE", undefined, {
+      headers: withAdminAuth(),
     });
-
-    const data = await parseJsonSafe(r);
-    if (!r.ok) throw new Error(data?.error || data?._raw || `HTTP ${r.status}`);
 
     router.push("/admin/submissions");
   } catch (e) {
-    msg.value = `Помилка: ${e.message}`;
+    msg.value = `Помилка: ${e?.message || "невідома"}`;
   } finally {
     deleting.value = false;
   }
@@ -239,21 +200,18 @@ async function remove() {
 async function toggleReviewed() {
   reviewBusy.value = true;
   msg.value = "";
+
   try {
     const id = route.params.id;
-    const r = await fetch(`/admin/submissions/${id}/review`, {
-      method: "POST",
-      headers: {Authorization: `Bearer ${token()}`},
-    });
-    const data = await parseJsonSafe(r);
-    if (!r.ok) throw new Error(data?.error || data?._raw || `HTTP ${r.status}`);
 
-    msg.value = data.reviewed
-        ? "Позначено як перевірено ✅"
-        : "Позначку знято ↩️";
+    const data = await apiJson(`/admin/submissions/${id}/review`, "POST", {}, {
+      headers: withAdminAuth(),
+    });
+
+    msg.value = data?.reviewed ? "Позначено як перевірено ✅" : "Позначку знято ↩️";
     await load();
   } catch (e) {
-    msg.value = `Помилка: ${e.message}`;
+    msg.value = `Помилка: ${e?.message || "невідома"}`;
   } finally {
     reviewBusy.value = false;
   }
@@ -263,9 +221,7 @@ onMounted(load);
 </script>
 
 <style scoped>
-.p {
-  padding: 24px;
-}
+.p { padding: 24px; }
 
 .top {
   display: flex;
@@ -278,6 +234,7 @@ onMounted(load);
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .meta {
@@ -322,14 +279,8 @@ onMounted(load);
   flex-wrap: wrap;
 }
 
-.qtext {
-  font-weight: 700;
-}
-
-.req {
-  color: #d00;
-  font-weight: 700;
-}
+.qtext { font-weight: 700; }
+.req { color: #d00; font-weight: 700; }
 
 .type {
   font-size: 12px;
@@ -396,18 +347,11 @@ onMounted(load);
   cursor: not-allowed;
 }
 
-.err {
-  color: #d00;
-}
-
-.msg {
-  margin-top: 12px;
-}
 .btn.danger {
   background: #d00;
   color: #fff;
 }
-.btn.danger:disabled {
-  opacity: 0.6;
-}
+
+.err { color: #d00; }
+.msg { margin-top: 12px; }
 </style>

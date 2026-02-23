@@ -64,6 +64,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
+import { apiGet, apiJson } from "../api";
 
 const loading = ref(true);
 const error = ref("");
@@ -79,41 +80,6 @@ const submissionId = ref(null);
 const missingIds = ref([]);
 const missingSet = computed(() => new Set(missingIds.value));
 
-async function apiGet(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(await safeErr(r));
-  return r.json();
-}
-
-async function apiJson(url, method, body) {
-  const r = await fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) {
-    const data = await safeJson(r);
-    const msg = data?.error || `HTTP ${r.status}`;
-    const e = new Error(msg);
-    e.data = data;
-    e.status = r.status;
-    throw e;
-  }
-  return r.json();
-}
-
-async function safeJson(r) {
-  try {
-    return await r.json();
-  } catch {
-    return null;
-  }
-}
-async function safeErr(r) {
-  const data = await safeJson(r);
-  return data?.error || `HTTP ${r.status}`;
-}
-
 onMounted(async () => {
   try {
     const data = await apiGet("/forms/main-brief");
@@ -121,11 +87,10 @@ onMounted(async () => {
     questions.value = data.questions || [];
 
     for (const q of questions.value) {
-      if (q.qtype === "checkbox") values[q.id] = false;
-      else values[q.id] = "";
+      values[q.id] = q.qtype === "checkbox" ? false : "";
     }
   } catch (e) {
-    error.value = e.message || "Не вдалось завантажити форму";
+    error.value = e?.message || "Не вдалось завантажити форму";
   } finally {
     loading.value = false;
   }
@@ -142,8 +107,12 @@ function buildAnswersPayload() {
 
 async function ensureSubmission() {
   if (submissionId.value) return submissionId.value;
+
   const created = await apiJson("/submissions", "POST", { formSlug: "main-brief" });
   submissionId.value = created?.submission?.id || null;
+
+  if (!submissionId.value) throw new Error("Не вдалося створити чернетку");
+
   return submissionId.value;
 }
 
@@ -151,12 +120,13 @@ async function saveDraft() {
   statusMsg.value = "";
   missingIds.value = [];
   busy.value = true;
+
   try {
     const id = await ensureSubmission();
     await apiJson(`/submissions/${id}`, "PATCH", buildAnswersPayload());
     statusMsg.value = "Чернетку збережено ✅";
   } catch (e) {
-    statusMsg.value = `Помилка: ${e.message}`;
+    statusMsg.value = `Помилка: ${e?.message || "невідома"}`;
   } finally {
     busy.value = false;
   }
@@ -175,11 +145,11 @@ async function onSubmit() {
 
     statusMsg.value = "Відправлено ✅";
   } catch (e) {
-    if (e.status === 400 && e.data?.missingQuestionIds) {
+    if (e?.status === 400 && e?.data?.missingQuestionIds) {
       missingIds.value = e.data.missingQuestionIds;
       statusMsg.value = "Заповніть обовʼязкові поля!";
     } else {
-      statusMsg.value = `Помилка: ${e.message}`;
+      statusMsg.value = `Помилка: ${e?.message || "невідома"}`;
     }
   } finally {
     busy.value = false;
