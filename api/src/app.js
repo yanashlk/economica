@@ -56,7 +56,7 @@ app.post("/auth/login", async (req, res) => {
 /**
  * PUBLIC: get form by slug
  */
-app.get("/forms/:slug", async (req, res) => {
+app.get("/api/forms/:slug", async (req, res) => {
     try {
         const { slug } = req.params;
         const pool = getPool();
